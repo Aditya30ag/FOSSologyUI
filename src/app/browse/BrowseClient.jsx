@@ -21,6 +21,7 @@ SPDX-License-Identifier: GPL-2.0-only
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import arrayToTree from "array-to-tree";
+import "./BrowseClient.css";
 
 // Constants
 import routes from "@/constants/routes";
@@ -29,13 +30,12 @@ import {
   statusOptions,
   entriesOptions,
   assignOptions,
-  actionsOptions,
   initialMessage,
 } from "@/constants/constants";
 
 // Components
 import { InputContainer, Alert } from "@/components/Widgets";
-import TreeContainer from "@/components/TreeContainer";
+// import TreeContainer from "@/components/TreeContainer";
 import Pagination from '@mui/material/Pagination';
 
 // Services
@@ -48,6 +48,14 @@ import {
   getFileNameFromContentDispostionHeader,
   handleError,
 } from "@/shared/helper";
+
+const reportGenerationOptions = [
+  { id: 'clixml', name: 'CLIXML generation'},
+  { id: 'cyclonedx', name: 'CycloneDX generation'},
+  { id: 'readmeoss', name: 'ReadME.OSS generation'},
+  { id: 'spdx2', name: 'SPDX2 generation'},
+  { id: 'spdx3', name: 'SPDX3 generation'}
+];
 
 const BrowseClient = () => {
   const router = useRouter();
@@ -68,6 +76,11 @@ const BrowseClient = () => {
   const [showMessage, setShowMessage] = useState(false);
   const [query, setQuery] = useState("");
   const [pages, setPages] = useState(1);
+  const [selectedRows, setSelectedRows] = useState(new Set());
+  const [folderSearchQuery, setFolderSearchQuery] = useState("");
+  const [loadingReports, setLoadingReports] = useState(new Set());
+  const [expandedFolders, setExpandedFolders] = useState(new Set([1]));
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   useEffect(() => {
     setMessage({ type: "success", text: messages.loading });
@@ -156,6 +169,111 @@ const BrowseClient = () => {
       });
   };
 
+  const handleReportGeneration = (reportType) => {
+    setLoadingReports(prev => new Set(prev).add(reportType));
+
+    // Simulate report generation
+    setTimeout(() => {
+      setLoadingReports(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(reportType);
+        return newSet;
+      });
+
+      setMessage({ type: "success", text: `${reportType} report generated successfully!` });
+      setShowMessage(true);
+      setTimeout(() => setShowMessage(false), 3000);
+    }, 2000);
+  };
+
+  const toggleRowSelection = (id) => {
+    setSelectedRows(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleAllRows = () => {
+    const currentPageData = filteredData.slice(
+      (browseData.page - 1) * browseData.limit,
+      browseData.page * browseData.limit
+    );
+
+    if (selectedRows.size === currentPageData.length) {
+      setSelectedRows(new Set());
+    } else {
+      setSelectedRows(new Set(currentPageData.map(item => item.id)));
+    }
+  };
+
+  const toggleFolderExpansion = (folderId) => {
+    setExpandedFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
+    });
+  };
+
+  const expandAllFolders = () => {
+    const allFolderIds = folderList.flatMap(folder =>
+      [folder.id, ...(folder.children?.map(child => child.id) || [])]
+    );
+    setExpandedFolders(new Set(allFolderIds));
+  };
+
+  const collapseAllFolders = () => {
+    setExpandedFolders(new Set());
+  };
+
+  const filteredData = browseDataList.filter((item) =>
+    query ? item?.uploadname.toLowerCase().includes(query.toLowerCase()) : true
+  );
+
+  const filteredFolderList = folderList.filter(folder =>
+    folderSearchQuery ? folder.name.toLowerCase().includes(folderSearchQuery.toLowerCase()) : true
+  );
+
+  const renderFolderTree = (folders, level = 0) => {
+    return folders.map(folder => (
+      <div key={folder.id}>
+        <div
+          className={`folder-item ${browseData.folderId === folder.id ? 'selected' : ''}`}
+          style={{ paddingLeft: `${level * 20 + 12}px` }}
+          onClick={() => handleClick(null, folder.id)}
+        >
+          <span
+            className="folder-toggle"
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleFolderExpansion(folder.id);
+            }}
+          >
+            {folder.children?.length > 0 ? (
+              expandedFolders.has(folder.id) ? '▼' : '▶'
+            ) : (
+              '- '
+            )}
+          </span>
+          <span className="folder-name">{folder.name}</span>
+        </div>
+        {folder.children && expandedFolders.has(folder.id) && (
+          <div className="folder-children">
+            {renderFolderTree(folder.children, level + 1)}
+          </div>
+        )}
+      </div>
+    ));
+  };
+
   const handleClick = (e, id) => {
     if (e?.preventDefault) e.preventDefault();
     setPages(1);
@@ -170,7 +288,9 @@ const BrowseClient = () => {
   };
 
   return (
-    <div className="main-container my-3">
+    <div className="browse-container">
+      <div className="browse-title">Browse</div>
+
       {showMessage && (
         <Alert
           type={message.type}
@@ -178,157 +298,227 @@ const BrowseClient = () => {
           message={message.text}
         />
       )}
-      <div className="row">
-        <div className="col-md-3 col-lg-2">
-          <h2 className="font-size-sub-heading">Folder Navigation</h2>
-          {folderList.length > 0 && (
-            <TreeContainer
-              folderCount={folderCount}
-              data={folderList}
-              handleClick={handleClick}
-            />
+
+      <div className="main-layout">
+        {/* Left Sidebar - Folder Navigation */}
+        <div
+          className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}
+          style={{ width: sidebarCollapsed ? '60px' : '280px' }}
+        >
+
+          <div className="sidebar-header">
+            {!sidebarCollapsed && <h3 className="sidebar-title">Folder Navigation</h3>}
+            <button
+              className="toggle-sidebar"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              {sidebarCollapsed ? '☰' : '◀'}
+            </button>
+          </div>
+
+          {!sidebarCollapsed && (
+            <>
+              <div className="sidebar-controls">
+                <button className="sidebar-btn" onClick={collapseAllFolders}>
+                  Collapse All
+                </button>
+                <button className="sidebar-btn" onClick={expandAllFolders}>
+                  Expand All
+                </button>
+              </div>
+
+              <input
+                type="text"
+                className="search-input"
+                placeholder="Search folder..."
+                value={folderSearchQuery}
+                onChange={(e) => setFolderSearchQuery(e.target.value)}
+              />
+
+              <div className="folder-tree">
+                {renderFolderTree(filteredFolderList)}
+              </div>
+            </>
           )}
         </div>
 
-        <div className="col-md-9 col-lg-10">
-          <table className="table table-striped text-primary-color font-size-medium table-responsive-sm table-bordered">
-            <thead>
-              <tr>
-                <th colSpan="6" className="font-size-sub-heading text-center">
-                  Uploads in Software Repository
-                </th>
-              </tr>
-              <tr className="font-demi">
-                <td colSpan="6" className="p-2 m-2">
-                  <span className="mt-1">Show entries: </span>
-                  <InputContainer
-                    name="limit"
-                    type="select"
-                    onChange={handleChange}
-                    options={entriesOptions}
-                    property="entry"
-                  />
-                </td>
-              </tr>
-              <tr>
-                <th>
-                  <input
-                    type="search"
-                    className="form-control"
-                    placeholder="Filter upload"
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                </th>
-                <th>
-                  <InputContainer
-                    name="status"
-                    type="select"
-                    onChange={handleChange}
-                    options={statusOptions}
-                    property="name"
-                  />
-                </th>
-                <th />
-                <th />
-                <th>
-                  <InputContainer
-                    name="assign"
-                    type="select"
-                    onChange={handleChange}
-                    options={assignOptions}
-                    property="name"
-                  />
-                </th>
-              </tr>
-              <tr className="font-bold text-center">
-                <th>Upload Name and Description</th>
-                <th>Status</th>
-                <th>Comment</th>
-                <th>Main Licenses</th>
-                <th>Assigned to</th>
-                <th>Upload Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {browseDataList
-                ?.filter((item) =>
-                  query ? item?.uploadname.toLowerCase().includes(query.toLowerCase()) : true
-                )
-                ?.map((data) => (
-                  <tr key={data?.id} className="text-center">
-                    <td>
-                      <a
-                        href={`${routes.browseUploads.licenseBrowser}?uploadID=${data.id}`}
-                      >
-                        <div className="text-primary-color">
-                          <div className="font-demi">{data?.uploadname}</div>
-                          <div className="font-size-small">{data?.description}</div>
-                        </div>
-                      </a>
-                      <InputContainer
-                        name="action"
-                        type="select"
-                        onChange={(e) => handleActionChange(e, data?.id)}
-                        options={actionsOptions}
-                        property="name"
-                        defaultValue="0"
-                        valueProperty="reportFormat"
-                      />
-                    </td>
-                    <td>
-                      <InputContainer
-                        name="status"
-                        type="select"
-                        onChange={handleChange}
-                        options={statusOptions}
-                        property="name"
-                      />
-                    </td>
-                    <td>-</td>
-                    <td>-</td>
-                    <td>
-                      <InputContainer
-                        name="assign"
-                        type="select"
-                        onChange={handleChange}
-                        options={assignOptions}
-                        property="name"
-                      />
-                    </td>
-                    <td>{data?.uploaddate.split(".")[0]}</td>
-                  </tr>
+        {/* Main Content Area */}
+        <div className="main-content">
+          <div className="content-header">
+            <h1 className="content-title">Uploads in Software Repository</h1>
+          </div>
+
+          <div className="controls-bar">
+            <div className="control-group">
+              <span className="control-label">Search:</span>
+              <input
+                type="text"
+                className="search-input-main"
+                placeholder="Search uploads..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+
+            <div className="control-group">
+              <span className="control-label">Status:</span>
+              <select className="select-input" onChange={handleChange} name="status">
+                <option value="">All Status</option>
+                {statusOptions.map(option => (
+                  <option key={option.id} value={option.name}>{option.name}</option>
                 ))}
-              <tr>
-                <td colSpan="6">
-                  <div className="right-pagination">
-                    Page:
-                    {pagesOptions && (
-                      <div className="row">
-                        <Pagination
-                          name="page"
-                          className="col-md-6 pagination-div"
-                          count={pages}
-                          page={browseData.page}
-                          onChange={handlePageChange}
+              </select>
+            </div>
+
+            <div className="control-group">
+              <span className="control-label">Assigned to:</span>
+              <select className="select-input" onChange={handleChange} name="assign">
+                <option value="">All Users</option>
+                {assignOptions.map(option => (
+                  <option key={option.id} value={option.name}>{option.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="control-group">
+              <span className="control-label">Show entries:</span>
+              <select className="select-input" onChange={handleChange} name="limit" value={browseData.limit}>
+                {entriesOptions.map(option => (
+                  <option key={option.id} value={option.entry}>{option.entry}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="table-container">
+            <table className="modern-table">
+              <thead>
+                <tr>
+                  <th className="checkbox-cell">
+                    <input
+                      type="checkbox"
+                      className="checkbox-input"
+                      onChange={toggleAllRows}
+                      checked={selectedRows.size === filteredData.slice(
+                        (browseData.page - 1) * browseData.limit,
+                        browseData.page * browseData.limit
+                      ).length && filteredData.length > 0}
+                    />
+                  </th>
+                  <th>Upload Name and Description</th>
+                  <th>Action</th>
+                  <th>Status</th>
+                  <th>Comment</th>
+                  <th>Main Licenses</th>
+                  <th>Upload Date</th>
+                  <th>Assigned to</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredData
+                  .slice(
+                    (browseData.page - 1) * browseData.limit,
+                    browseData.page * browseData.limit
+                  )
+                  .map((data) => (
+                    <tr key={data?.id}>
+                      <td className="checkbox-cell">
+                        <input
+                          type="checkbox"
+                          className="checkbox-input"
+                          checked={selectedRows.has(data.id)}
+                          onChange={() => toggleRowSelection(data.id)}
                         />
-                        <div className="row">
-                          Go to:&nbsp;
-                          <input
-                            type="number"
-                            className="pagination-textarea"
-                            size="3"
-                            onChange={(event) =>
-                              handlePageChange(event, Number(event.target.value))
-                            }
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                      </td>
+                      <td>
+                        <a
+                          href={`${routes.browseUploads.licenseBrowser}?uploadID=${data.id}`}
+                          style={{ textDecoration: 'none', color: 'inherit' }}
+                        >
+                          <div className="upload-name">{data?.uploadname || 'Unknown Upload'}</div>
+                          <div className="upload-description">{data?.description || 'No description available'}</div>
+                        </a>
+                      </td>
+                      <td>
+                        <select className="action-select" onChange={(e) => handleActionChange(e, data?.id)}>
+                          <option value="">Select action</option>
+                          <option value="open">Open</option>
+                          <option value="delete">Delete</option>
+                        </select>
+                      </td>
+                      <td>
+                        <span className={`status-badge status-${data.status?.replace(' ', '-') || 'unknown'}`}>
+                          {data.status || 'Unknown'}
+                        </span>
+                      </td>
+                      <td>{data.comment || '-'}</td>
+                      <td>{data.mainLicenses || '-'}</td>
+                      <td>{data?.uploaddate ? data.uploaddate.split(".")[0] : 'Unknown Date'}</td>
+                      <td>
+                        <select
+                          className="action-select"
+                          onChange={handleChange}
+                          name="assign"
+                          value={data.assignedTo}
+                        >
+                          {assignOptions.map(option => (
+                            <option key={option.id} value={option.name}>
+                              {option.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="pagination-container">
+            <div className="pagination-info">
+              Showing {(browseData.page - 1) * browseData.limit + 1} to {Math.min(browseData.page * browseData.limit, filteredData.length)} of {filteredData.length} entries
+            </div>
+
+            {pagesOptions && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <Pagination
+                  count={pages}
+                  page={browseData.page}
+                  onChange={handlePageChange}
+                  color="primary"
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span>Go to:</span>
+                  <input
+                    type="number"
+                    style={{ width: '60px', padding: '4px 8px', border: '1px solid #e2e8f0', borderRadius: '4px' }}
+                    onChange={(event) =>
+                      handlePageChange(event, Number(event.target.value))
+                    }
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons Panel */}
+      <div style={{ maxWidth: '1320px', margin: '0 auto', padding: '0 24px' }}>
+        <div className="action-buttons">
+          <h3 className="action-buttons-title">Run</h3>
+          <div className="action-buttons-grid">
+            {reportGenerationOptions.map((option) => (
+              <button
+                key={option.id}
+                className={`action-button ${loadingReports.has(option.id) ? 'loading' : ''}`}
+                onClick={() => handleReportGeneration(option.id)}
+                disabled={loadingReports.has(option.id)}
+              >
+                <span>{loadingReports.has(option.id) ? 'Generating...' : option.name}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>

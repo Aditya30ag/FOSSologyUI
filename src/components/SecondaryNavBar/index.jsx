@@ -19,7 +19,7 @@ SPDX-License-Identifier: GPL-2.0-only
 
 "use client";
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import routes from "@/constants/routes";
@@ -36,8 +36,8 @@ import {
 const navLinks = [
   {
     name: "License Browser",
-    href: (uploadID) => 
-      uploadID 
+    href: (uploadID) =>
+      uploadID
     ? `${routes.browseUploads.licenseBrowser}?uploadID=${uploadID}`
     : routes.browseUploads.licenseBrowser,
     match: routes.browseUploads.licenseBrowser,
@@ -82,6 +82,7 @@ const BrowseHeader = ({ title }) => {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const uploadID = searchParams.get("uploadID");
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const [open, setOpen] = useState(false)
 
@@ -93,7 +94,11 @@ const BrowseHeader = ({ title }) => {
 
   const chevronColor = isActive ? "#004494" : "#101010"
 
-  if (!isAuth()) return null;
+  useEffect(() => {
+    setIsAuthenticated(isAuth());
+  }, []);
+
+  if (!isAuthenticated) return null;
 
   return (
     <div className="w-full bg-gray-100 h-18 px-4 flex items-end justify-between">

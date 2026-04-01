@@ -23,12 +23,12 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 
-import { DropdownMenu, 
-  DropdownMenuTrigger, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSub, 
-  DropdownMenuSubTrigger, 
+import { DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
   DropdownMenuSubContent} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 
@@ -46,6 +46,10 @@ import { getLocalStorage, setLocalStorage } from "@/shared/storageHelper";
 
 export default function Header() {
   const [currentGroup, setCurrentGroup] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [groups, setGroups] = useState([]);
   const pathname = usePathname();
   const router = useRouter();
 
@@ -78,6 +82,12 @@ export default function Header() {
       getLocalStorage("currentGroup") ||
       getLocalStorage("user")?.default_group;
     setCurrentGroup(defaultGroup);
+
+    // Set authentication state after component mounts
+    setIsAuthenticated(isAuth());
+    setIsUserAdmin(isAdmin());
+    setUserName(getUserName());
+    setGroups(getAllGroups());
   }, []);
 
   const handleGroupChange = (groupName) => {
@@ -94,7 +104,7 @@ export default function Header() {
         {/* Navigation Menu */}
         <nav className="hidden md:flex">
           <Link href={routes.home} className={clsx("flex items-center h-13 p-4 justify-between", !isHomeActive ? "hover:border-b-2 hover:border-[#C31730] hover:font-medium" : "border-b-2 border-[#C31730] font-medium")}>Home</Link>
-          {isAuth() && (
+          {isAuthenticated && (
             <>
               <Link href={routes.search} className={clsx("flex items-center h-13 p-4 justify-between", !isSearchActive ? "hover:border-b-2 hover:border-[#C31730] hover:font-medium" : "border-b-2 border-[#C31730] font-medium")}>Search</Link>
               <Link href={routes.browse} className={clsx("flex items-center h-13 p-4 justify-between", !isBrowseActive ? "hover:border-b-2 hover:border-[#C31730] hover:font-medium" : "border-b-2 border-[#C31730] font-medium")}>Browse</Link>
@@ -158,7 +168,7 @@ export default function Header() {
                   <DropdownMenuItem asChild className="focus:bg-[#EDEDED] focus:text-gray-900 focus:font-bold">
                     <Link href={routes.jobs.myRecentJobs}>My Recent Jobs</Link>
                   </DropdownMenuItem>
-                  {isAdmin() && (
+                  {isUserAdmin && (
                     <DropdownMenuItem asChild className="focus:bg-[#EDEDED] focus:text-gray-900 focus:font-bold">
                       <Link href={routes.jobs.allRecentJobs}>All Recent Jobs</Link>
                     </DropdownMenuItem>
@@ -191,7 +201,7 @@ export default function Header() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" sideOffset={4} className="p-0 m-0 min-w-[220px] bg-white shadow-lg border border-gray-200 z-50">
                   <DropdownMenuSub>
-                    <DropdownMenuSubTrigger   
+                    <DropdownMenuSubTrigger
                     className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -241,7 +251,7 @@ export default function Header() {
               </DropdownMenu>
 
               {/* Admin Dropdown */}
-              {isAdmin() && (
+              {isUserAdmin && (
                 <DropdownMenu open={isAdminOpen} onOpenChange={setIsAdminOpen}>
                   <DropdownMenuTrigger
                     onClick={(e) => {
@@ -263,7 +273,7 @@ export default function Header() {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" sideOffset={4} className="p-0 m-0 min-w-[240px] bg-white shadow-lg border border-gray-200 z-50">
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger 
+                      <DropdownMenuSubTrigger
                       className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -276,7 +286,7 @@ export default function Header() {
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger 
+                      <DropdownMenuSubTrigger
                       className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -292,7 +302,7 @@ export default function Header() {
                     <Link href={""}>Customize</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger 
+                      <DropdownMenuSubTrigger
                       className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -311,7 +321,7 @@ export default function Header() {
                     <Link href={""}>Fossdash</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger 
+                      <DropdownMenuSubTrigger
                       className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -326,7 +336,7 @@ export default function Header() {
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger 
+                      <DropdownMenuSubTrigger
                       className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -354,7 +364,7 @@ export default function Header() {
                     <Link href={routes.admin.maintenance}>Maintenance</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger 
+                      <DropdownMenuSubTrigger
                       className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -374,7 +384,7 @@ export default function Header() {
                     <Link href={""}>Scheduler</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger 
+                      <DropdownMenuSubTrigger
                       className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -391,7 +401,7 @@ export default function Header() {
                     <Link href={""}>Upload Permissions</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger 
+                      <DropdownMenuSubTrigger
                       className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -431,7 +441,7 @@ export default function Header() {
                   <DropdownMenuContent align="start" sideOffset={4} className="p-0 m-0 min-w-[200px] bg-white shadow-lg border border-gray-200 z-50">
                     <DropdownMenuItem asChild className="focus:bg-[#EDEDED] focus:text-gray-900 focus:font-bold"><Link href={routes.help.about}>About</Link></DropdownMenuItem>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger 
+                      <DropdownMenuSubTrigger
                       className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -449,7 +459,7 @@ export default function Header() {
                     </DropdownMenuSub>
                     <DropdownMenuItem asChild className="focus:bg-[#EDEDED] focus:text-gray-900 focus:font-bold"><Link href={externalLinks.fossologyWiki} target="_blank" rel="noreferrer">Documentation</Link></DropdownMenuItem>
                     <DropdownMenuSub>
-                      <DropdownMenuSubTrigger 
+                      <DropdownMenuSubTrigger
                       className={clsx(
                         "flex items-center justify-between w-full px-2 py-2 text-sm rounded-md cursor-pointer",
                         "hover:bg-[#EDEDED] hover:text-gray-900 hover:font-bold",
@@ -459,7 +469,7 @@ export default function Header() {
                       </DropdownMenuSubTrigger>
                       <DropdownMenuSubContent className="p-0 m-0 bg-white border border-gray-200">
                         <DropdownMenuItem asChild className="focus:bg-[#EDEDED] focus:text-gray-900 focus:font-bold"><Link href={routes.help.licenseBrowser}>License Browser</Link></DropdownMenuItem>
-                        <DropdownMenuItem asChild className="focus:bg-[#EDEDED] focus:text-gray-900 focus:font-bold"><Link href={routes.help.overview}>Overview</Link></DropdownMenuItem>                        
+                        <DropdownMenuItem asChild className="focus:bg-[#EDEDED] focus:text-gray-900 focus:font-bold"><Link href={routes.help.overview}>Overview</Link></DropdownMenuItem>
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                     <DropdownMenuItem asChild className="focus:bg-[#EDEDED] focus:text-gray-900 focus:font-bold"><Link href={routes.help.thirdPartyLicenses}>Third Party Licenses</Link></DropdownMenuItem>
@@ -473,7 +483,7 @@ export default function Header() {
       {/* Right Side Icons */}
       <div className="flex items-center gap-6 text-sm text-gray-800">
         {/* Group Dropdown */}
-        {getAllGroups() && (
+        {groups && (
           <DropdownMenu open={isGroupOpen} onOpenChange={setIsGroupOpen}>
             <DropdownMenuTrigger
               onClick={(e) => {
@@ -488,7 +498,7 @@ export default function Header() {
               <img
               src="/assets/icons/User/User_24px.svg"
               alt="User"
-              /> 
+              />
               Group: {currentGroup}
               {isGroupOpen ? (
                 <img
@@ -537,7 +547,7 @@ export default function Header() {
 
                     {isGroupSelectOpen && (
                       <div className="mt-1 border rounded-[4px] border-[#CECECE] shadow bg-white overflow-hidden">
-                        {getAllGroups().map((group) => (
+                        {groups.map((group) => (
                           <div
                             key={group.id}
                             onClick={() => {
@@ -558,28 +568,28 @@ export default function Header() {
 
                 {/* User Info */}
                 <div className="text-sm mt-2">
-                  <span className="font-semibold">User:</span> {getUserName()}
+                  <span className="font-semibold">User:</span> {userName}
                 </div>
 
                 {/* Logout Button */}
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full justify-center gap-2 
-                  text-[#004494] 
-                  border-[#004494] 
-                  hover:bg-[#DEE7F2] 
-                  hover:text-[#000B54] 
-                  hover:border-[#000B54] 
-                  cursor-pointer 
-                  rounded-[4px] h-10 
+                  className="w-full justify-center gap-2
+                  text-[#004494]
+                  border-[#004494]
+                  hover:bg-[#DEE7F2]
+                  hover:text-[#000B54]
+                  hover:border-[#000B54]
+                  cursor-pointer
+                  rounded-[4px] h-10
                   font-medium text-base px-4 py-2"
                   onClick={() => logout(null)}
                 >
                   <img
                   src="/assets/icons/Logout/Logout_24px.svg"
                   alt="Logout"
-                  /> 
+                  />
                   Logout
                 </Button>
               </div>
